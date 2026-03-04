@@ -1,4 +1,1 @@
-
-pygame~=2.6.0
-typing-extensions
-``
+The will to survive!
