@@ -5,6 +5,8 @@ Patch Protocol, a cybersecurity tower defense game created using react and HTML.
 
 Each tower has 3 upgrades and can be sold for 60% of its cost. Press 1x/2x/3x to control game speed. Good luck defending the server!
 
+Link: https://taliakaraberis.github.io/game-patch-protocol/patch-protocol.html
+
 ## How to play
 - Click Initialize System, then place towers on any green grid tile (not on the blue network path)
 - Hit Deploy Wave when ready - threats travel the path toward your server
