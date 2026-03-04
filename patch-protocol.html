@@ -1,0 +1,1246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PATCH PROTOCOL</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap');
+
+:root {
+  --bg:       #080d14;
+  --panel:    #0c1520;
+  --border:   #1a3a2a;
+  --green:    #00ff88;
+  --dgreen:   #00cc66;
+  --teal:     #00e5cc;
+  --red:      #ff3355;
+  --orange:   #ff8800;
+  --yellow:   #ffe033;
+  --blue:     #4488ff;
+  --purple:   #cc44ff;
+  --text:     #b0d4c0;
+  --dimtext:  #4a7a5a;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Rajdhani', sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px;
+  overflow-x: hidden;
+}
+
+/* Grid noise texture */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(0,255,136,0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,255,136,0.02) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none; z-index: 0;
+}
+
+#game-wrap {
+  position: relative; z-index: 1;
+  width: 100%; max-width: 1060px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+
+/* ── HEADER ── */
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 0 6px;
+  border-bottom: 1px solid var(--border);
+}
+.logo {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 1.5rem;
+  color: var(--green);
+  text-shadow: 0 0 20px rgba(0,255,136,0.5);
+  letter-spacing: 0.15em;
+}
+.logo span { color: var(--teal); }
+.header-stats {
+  display: flex; gap: 24px;
+}
+.hstat { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.hstat-label { font-size: 0.62rem; color: var(--dimtext); letter-spacing: 0.15em; text-transform: uppercase; font-family: 'Share Tech Mono', monospace; }
+.hstat-val { font-family: 'Share Tech Mono', monospace; font-size: 1.05rem; color: var(--green); }
+.hstat-val.red { color: var(--red); }
+.hstat-val.orange { color: var(--orange); }
+.hstat-val.yellow { color: var(--yellow); }
+
+/* ── MAIN LAYOUT ── */
+#main-layout {
+  display: grid;
+  grid-template-columns: 1fr 260px;
+  gap: 10px;
+}
+
+/* ── CANVAS AREA ── */
+#canvas-wrap {
+  position: relative;
+  border: 1px solid var(--border);
+  background: #060c10;
+  box-shadow: inset 0 0 40px rgba(0,0,0,0.6), 0 0 20px rgba(0,255,136,0.05);
+  overflow: hidden;
+}
+canvas { display: block; }
+
+/* Wave bar */
+#wave-bar {
+  position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.75rem; color: var(--yellow);
+  text-shadow: 0 0 10px rgba(255,224,51,0.6);
+  letter-spacing: 0.2em;
+  pointer-events: none;
+  opacity: 0; transition: opacity 0.4s;
+}
+#wave-bar.show { opacity: 1; }
+
+/* ── SIDE PANEL ── */
+#side-panel {
+  display: flex; flex-direction: column; gap: 10px;
+}
+
+.panel-box {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 12px 14px;
+}
+.panel-title {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.65rem; color: var(--dimtext);
+  letter-spacing: 0.2em; text-transform: uppercase;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Server health */
+#server-health-bar {
+  height: 10px; background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(0,255,136,0.15); margin-bottom: 6px;
+}
+#server-health-fill {
+  height: 100%; width: 100%;
+  background: linear-gradient(90deg, var(--green), var(--teal));
+  transition: width 0.3s, background 0.5s;
+  box-shadow: 0 0 8px rgba(0,255,136,0.4);
+}
+
+/* Tower buttons */
+#tower-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 7px;
+}
+.tower-btn {
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.82rem; font-weight: 600;
+  padding: 9px 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+  position: relative;
+  overflow: hidden;
+}
+.tower-btn::before {
+  content: ''; position: absolute; inset: 0;
+  background: currentColor; opacity: 0;
+  transition: opacity 0.15s;
+}
+.tower-btn:hover::before { opacity: 0.06; }
+.tower-btn.selected { border-color: var(--green); box-shadow: 0 0 8px rgba(0,255,136,0.25); }
+.tower-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.tower-btn .t-icon { font-size: 1.2rem; display: block; margin-bottom: 3px; }
+.tower-btn .t-name { display: block; color: var(--green); font-size: 0.8rem; }
+.tower-btn .t-cost { display: block; font-family: 'Share Tech Mono', monospace; font-size: 0.7rem; color: var(--yellow); }
+.tower-btn .t-desc { display: block; font-size: 0.68rem; color: var(--dimtext); margin-top: 2px; line-height: 1.3; }
+
+/* Upgrade panel */
+#upgrade-panel { display: none; }
+#upgrade-panel.visible { display: block; }
+.upg-name {
+  font-size: 1rem; font-weight: 700; color: var(--teal); margin-bottom: 6px;
+}
+.upg-stats { font-size: 0.75rem; color: var(--dimtext); margin-bottom: 10px; line-height: 1.8; font-family: 'Share Tech Mono', monospace; }
+.upg-stats span { color: var(--text); }
+.upg-btn {
+  width: 100%; padding: 8px; margin-bottom: 6px;
+  background: rgba(0,255,136,0.06); border: 1px solid rgba(0,255,136,0.25);
+  color: var(--green); font-family: 'Rajdhani', sans-serif;
+  font-size: 0.82rem; font-weight: 600; cursor: pointer;
+  transition: all 0.15s; text-align: left; display: flex; justify-content: space-between;
+}
+.upg-btn:hover { background: rgba(0,255,136,0.12); }
+.upg-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.upg-btn.maxed { color: var(--teal); border-color: var(--teal); background: rgba(0,229,204,0.06); cursor: default; }
+.sell-btn {
+  width: 100%; padding: 7px;
+  background: rgba(255,51,85,0.06); border: 1px solid rgba(255,51,85,0.25);
+  color: var(--red); font-family: 'Rajdhani', sans-serif;
+  font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: all 0.15s;
+}
+.sell-btn:hover { background: rgba(255,51,85,0.12); }
+
+/* Wave info */
+.wave-info { font-size: 0.78rem; line-height: 1.9; font-family: 'Share Tech Mono', monospace; }
+.threat-tag {
+  display: inline-block; padding: 1px 7px; border-radius: 2px;
+  font-size: 0.65rem; font-weight: 600; letter-spacing: 0.05em;
+  margin-right: 4px;
+}
+
+/* Log */
+#log { max-height: 110px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+#log::-webkit-scrollbar { width: 3px; }
+#log::-webkit-scrollbar-thumb { background: var(--border); }
+.log-line { font-family: 'Share Tech Mono', monospace; font-size: 0.68rem; line-height: 1.5; }
+.log-line.good { color: var(--green); }
+.log-line.bad  { color: var(--red); }
+.log-line.info { color: var(--dimtext); }
+.log-line.warn { color: var(--yellow); }
+
+/* Start wave btn */
+#start-wave-btn {
+  width: 100%; padding: 12px;
+  background: rgba(0,255,136,0.08); border: 1px solid rgba(0,255,136,0.4);
+  color: var(--green); font-family: 'Share Tech Mono', monospace;
+  font-size: 0.85rem; letter-spacing: 0.15em; cursor: pointer;
+  transition: all 0.2s; text-transform: uppercase;
+  box-shadow: 0 0 12px rgba(0,255,136,0.1);
+}
+#start-wave-btn:hover { background: rgba(0,255,136,0.15); box-shadow: 0 0 20px rgba(0,255,136,0.2); }
+#start-wave-btn:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
+
+/* Speed btn */
+#speed-btn {
+  position: absolute; bottom: 8px; right: 8px;
+  background: rgba(0,0,0,0.5); border: 1px solid var(--border);
+  color: var(--dimtext); font-family: 'Share Tech Mono', monospace;
+  font-size: 0.7rem; padding: 4px 10px; cursor: pointer;
+  transition: all 0.15s;
+}
+#speed-btn:hover { border-color: var(--green); color: var(--green); }
+
+/* ── SCREENS ── */
+.overlay {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 18px; z-index: 50;
+  background: rgba(6,12,16,0.92);
+  backdrop-filter: blur(3px);
+}
+.overlay.hidden { display: none; }
+.ov-title {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 2.2rem; letter-spacing: 0.15em;
+  text-shadow: 0 0 30px currentColor;
+}
+.ov-sub { font-size: 0.85rem; color: var(--dimtext); letter-spacing: 0.1em; text-align: center; line-height: 1.9; }
+.ov-btn {
+  font-family: 'Share Tech Mono', monospace; font-size: 0.8rem;
+  letter-spacing: 0.2em; padding: 12px 36px;
+  background: transparent; border: 1px solid var(--green);
+  color: var(--green); cursor: pointer; transition: all 0.2s;
+}
+.ov-btn:hover { background: rgba(0,255,136,0.1); box-shadow: 0 0 16px rgba(0,255,136,0.3); }
+
+/* Tooltip */
+#tooltip {
+  position: absolute; pointer-events: none; z-index: 40;
+  background: rgba(8,13,20,0.95); border: 1px solid var(--border);
+  padding: 8px 12px; font-size: 0.75rem; max-width: 180px;
+  font-family: 'Share Tech Mono', monospace; line-height: 1.6;
+  display: none;
+}
+#tooltip.show { display: block; }
+</style>
+</head>
+<body>
+<div id="game-wrap">
+  <header>
+    <div class="logo">PATCH<span>PROTOCOL</span></div>
+    <div class="header-stats">
+      <div class="hstat">
+        <div class="hstat-label">Credits</div>
+        <div class="hstat-val yellow" id="h-credits">150</div>
+      </div>
+      <div class="hstat">
+        <div class="hstat-label">Wave</div>
+        <div class="hstat-val" id="h-wave">0</div>
+      </div>
+      <div class="hstat">
+        <div class="hstat-label">Breaches</div>
+        <div class="hstat-val red" id="h-breaches">0 / 10</div>
+      </div>
+      <div class="hstat">
+        <div class="hstat-label">Score</div>
+        <div class="hstat-val" id="h-score">0</div>
+      </div>
+    </div>
+  </header>
+
+  <div id="main-layout">
+    <div id="canvas-wrap">
+      <canvas id="c" width="780" height="520"></canvas>
+      <div id="wave-bar">▶ WAVE INCOMING</div>
+      <button id="speed-btn" onclick="toggleSpeed()">1x</button>
+      <div id="tooltip"></div>
+
+      <!-- Title overlay -->
+      <div class="overlay" id="ov-title">
+        <div class="ov-title" style="color:var(--green)">PATCH PROTOCOL</div>
+        <div class="ov-sub">
+          Cyber threats are flooding your network.<br>
+          Deploy security patches to stop them reaching the server.<br><br>
+          <span style="color:var(--text)">Click a path tile to place a defense tower.</span><br>
+          <span style="color:var(--text)">Earn credits by neutralizing threats.</span>
+        </div>
+        <button class="ov-btn" onclick="initGame()">INITIALIZE SYSTEM</button>
+      </div>
+
+      <!-- Game over overlay -->
+      <div class="overlay hidden" id="ov-gameover">
+        <div class="ov-title" style="color:var(--red)">SERVER BREACHED</div>
+        <div class="ov-sub" id="go-stats"></div>
+        <button class="ov-btn" style="border-color:var(--red);color:var(--red)" onclick="initGame()">REBOOT SYSTEM</button>
+      </div>
+
+      <!-- Win overlay -->
+      <div class="overlay hidden" id="ov-win">
+        <div class="ov-title" style="color:var(--teal)">NETWORK SECURED</div>
+        <div class="ov-sub" id="win-stats"></div>
+        <button class="ov-btn" style="border-color:var(--teal);color:var(--teal)" onclick="initGame()">NEW DEPLOYMENT</button>
+      </div>
+    </div>
+
+    <div id="side-panel">
+      <!-- Server health -->
+      <div class="panel-box">
+        <div class="panel-title">Server Integrity</div>
+        <div id="server-health-bar"><div id="server-health-fill"></div></div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:0.7rem;color:var(--dimtext);text-align:right" id="server-hp-text">100 / 100</div>
+      </div>
+
+      <!-- Tower shop -->
+      <div class="panel-box" id="shop-box">
+        <div class="panel-title">Deploy Defenses — click map to place</div>
+        <div id="tower-grid"></div>
+      </div>
+
+      <!-- Upgrade panel -->
+      <div class="panel-box" id="upgrade-panel">
+        <div class="panel-title">Selected Tower</div>
+        <div class="upg-name" id="upg-name">—</div>
+        <div class="upg-stats" id="upg-stats"></div>
+        <div id="upg-btns"></div>
+        <button class="sell-btn" onclick="sellSelected()">SELL TOWER</button>
+        <button class="sell-btn" style="margin-top:6px;border-color:var(--border);color:var(--dimtext)" onclick="deselectTower()">DESELECT</button>
+      </div>
+
+      <!-- Wave info -->
+      <div class="panel-box">
+        <div class="panel-title">Threat Intel</div>
+        <div class="wave-info" id="wave-info">Deploy your defenses before launching the wave.</div>
+      </div>
+
+      <!-- Log -->
+      <div class="panel-box">
+        <div class="panel-title">System Log</div>
+        <div id="log"></div>
+      </div>
+
+      <button id="start-wave-btn" onclick="startWave()">► DEPLOY WAVE 1</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CONSTANTS ─────────────────────────────────────────────────────────────────
+const C = document.getElementById('c');
+const ctx = C.getContext('2d');
+const W = 780, H = 520;
+const TILE = 40;
+const COLS = W / TILE, ROWS = H / TILE; // 19.5 x 13
+
+// ── PATH DEFINITION ──────────────────────────────────────────────────────────
+// Path as grid coords [col, row]
+const PATH_COORDS = [
+  [0,2],[1,2],[2,2],[3,2],[4,2],[5,2],
+  [5,3],[5,4],[5,5],[5,6],
+  [6,6],[7,6],[8,6],[9,6],[10,6],
+  [10,5],[10,4],[10,3],[10,2],[10,1],
+  [11,1],[12,1],[13,1],[14,1],
+  [14,2],[14,3],[14,4],[14,5],[14,6],[14,7],[14,8],
+  [13,8],[12,8],[11,8],[10,8],[9,8],[8,8],
+  [8,9],[8,10],[8,11],[8,12],
+  [9,12],[10,12],[11,12],[12,12],[13,12],[14,12],[15,12],[16,12],[17,12],[18,12],[19,12]
+];
+
+// Build path pixel centers
+const PATH_PX = PATH_COORDS.map(([c,r]) => ({ x: c*TILE+TILE/2, y: r*TILE+TILE/2 }));
+const PATH_SET = new Set(PATH_COORDS.map(([c,r])=>`${c},${r}`));
+
+// ── TOWER DEFINITIONS ─────────────────────────────────────────────────────────
+const TOWER_DEFS = {
+  firewall: {
+    name: 'Firewall', icon: '🔥', color: '#ff6600',
+    cost: 60, damage: 18, range: 110, speed: 1.2,
+    desc: 'Basic AOE splash. Damages all threats in range.',
+    splash: 30,
+    upgrades: [
+      { name: 'Hot Zone', desc: '+40% splash radius', cost: 70, apply: t => { t.splash *= 1.4; } },
+      { name: 'Inferno', desc: '+60% damage', cost: 100, apply: t => { t.damage *= 1.6; } },
+      { name: 'Heatwave', desc: 'Burns — slows targets 20%', cost: 130, apply: t => { t.burns = true; } },
+    ]
+  },
+  ids: {
+    name: 'IDS Sensor', icon: '📡', color: '#4488ff',
+    cost: 80, damage: 35, range: 130, speed: 0.9,
+    desc: 'Detects & shoots single targets. High accuracy.',
+    upgrades: [
+      { name: 'Deep Packet', desc: '+50% range', cost: 80, apply: t => { t.range *= 1.5; } },
+      { name: 'Precision', desc: '+80% damage', cost: 110, apply: t => { t.damage *= 1.8; } },
+      { name: 'Zero-Day Alert', desc: 'Targets highest-HP enemy', cost: 140, apply: t => { t.targetsStrongest = true; } },
+    ]
+  },
+  honeypot: {
+    name: 'Honeypot', icon: '🍯', color: '#ffcc00',
+    cost: 100, damage: 8, range: 100, speed: 2.5,
+    desc: 'Lures & slows threats. Rapid weak shots.',
+    slow: 0.45,
+    upgrades: [
+      { name: 'Sticky Trap', desc: 'Slow increased to 65%', cost: 75, apply: t => { t.slow = 0.65; } },
+      { name: 'Double Lure', desc: 'Slows 2 targets at once', cost: 90, apply: t => { t.multiSlow = 2; } },
+      { name: 'Data Mimic', desc: '+100% damage', cost: 120, apply: t => { t.damage *= 2; } },
+    ]
+  },
+  antivirus: {
+    name: 'Antivirus', icon: '🛡', color: '#00ff88',
+    cost: 120, damage: 55, range: 90, speed: 0.5,
+    desc: 'Powerful, slow sniper. Prioritizes malware.',
+    upgrades: [
+      { name: 'Heuristic Scan', desc: 'Chains to 2 nearby enemies', cost: 100, apply: t => { t.chains = 2; } },
+      { name: 'Quarantine', desc: 'Stuns target 1.5s on hit', cost: 120, apply: t => { t.stuns = true; } },
+      { name: 'Zero-Trust', desc: '+100% damage, +30% range', cost: 160, apply: t => { t.damage *= 2; t.range *= 1.3; } },
+    ]
+  },
+  encryptor: {
+    name: 'Encryptor', icon: '🔐', color: '#cc44ff',
+    cost: 150, damage: 25, range: 120, speed: 1.8,
+    desc: 'Area encryption beam. Damages all in cone.',
+    cone: true,
+    upgrades: [
+      { name: 'AES-512', desc: '+70% damage', cost: 110, apply: t => { t.damage *= 1.7; } },
+      { name: 'Wide Beam', desc: 'Cone angle +50%', cost: 100, apply: t => { t.coneAngle = 0.7; } },
+      { name: 'Quantum Key', desc: 'Disables shields on enemies', cost: 170, apply: t => { t.disablesShield = true; } },
+    ]
+  },
+  patchbot: {
+    name: 'Patchbot', icon: '🤖', color: '#00e5cc',
+    cost: 200, damage: 40, range: 105, speed: 1.4,
+    desc: 'Auto-patching drone. Moderate all-around stats.',
+    upgrades: [
+      { name: 'Hotfix v2', desc: '+50% attack speed', cost: 90, apply: t => { t.speed *= 1.5; } },
+      { name: 'Full Scan', desc: 'Hits 3 targets per shot', cost: 120, apply: t => { t.multiTarget = 3; } },
+      { name: 'CVE Hunter', desc: 'Instantly kills low-HP (<15%) enemies', cost: 180, apply: t => { t.executes = true; } },
+    ]
+  },
+};
+
+// ── THREAT DEFINITIONS ────────────────────────────────────────────────────────
+const THREAT_DEFS = {
+  script_kiddie: { name: 'Script Kiddie', icon: '💻', color: '#88ff44', hp: 60,  speed: 1.2, reward: 12, armor: 0, tag: '#aaffaa' },
+  phishing:      { name: 'Phishing Bot',  icon: '🎣', color: '#ffaa00', hp: 90,  speed: 1.5, reward: 18, armor: 0, tag: '#ffcc88' },
+  ransomware:    { name: 'Ransomware',    icon: '💀', color: '#ff4444', hp: 180, speed: 0.8, reward: 30, armor: 10, tag: '#ff8888' },
+  ddos:          { name: 'DDoS Packet',   icon: '📦', color: '#4488ff', hp: 50,  speed: 2.5, reward: 14, reward2: 14, armor: 0, tag: '#88aaff', fast: true },
+  apt:           { name: 'APT Agent',     icon: '🕵', color: '#cc44ff', hp: 350, speed: 0.65, reward: 60, armor: 25, tag: '#cc88ff', shielded: true },
+  worm:          { name: 'Network Worm',  icon: '🐛', color: '#ffee00', hp: 130, speed: 1.1, reward: 24, armor: 5, tag: '#ffee88', splits: true },
+  botnet:        { name: 'Botnet Node',   icon: '🔗', color: '#ff6600', hp: 220, speed: 0.9, reward: 40, armor: 15, tag: '#ffaa66' },
+  zero_day:      { name: 'Zero-Day',      icon: '☠',  color: '#ff0055', hp: 600, speed: 0.55, reward: 100, armor: 40, tag: '#ff4488', boss: true },
+};
+
+// ── WAVE BLUEPRINTS ───────────────────────────────────────────────────────────
+const WAVES = [
+  [{ type:'script_kiddie', count:8, interval:90 }],
+  [{ type:'script_kiddie', count:6, interval:70 }, { type:'phishing', count:4, interval:100 }],
+  [{ type:'phishing', count:6, interval:80 }, { type:'ransomware', count:2, interval:150 }],
+  [{ type:'ddos', count:10, interval:45 }, { type:'phishing', count:5, interval:90 }],
+  [{ type:'ransomware', count:4, interval:120 }, { type:'worm', count:3, interval:130 }],
+  [{ type:'ddos', count:8, interval:40 }, { type:'ransomware', count:3, interval:110 }, { type:'phishing', count:4, interval:80 }],
+  [{ type:'botnet', count:4, interval:130 }, { type:'worm', count:4, interval:110 }],
+  [{ type:'apt', count:2, interval:200 }, { type:'ddos', count:8, interval:50 }],
+  [{ type:'botnet', count:5, interval:100 }, { type:'ransomware', count:5, interval:100 }, { type:'worm', count:4, interval:110 }],
+  [{ type:'zero_day', count:1, interval:0 }, { type:'apt', count:2, interval:180 }, { type:'botnet', count:4, interval:120 }],
+];
+
+// ── GAME STATE ────────────────────────────────────────────────────────────────
+let credits, serverHp, serverMaxHp, wave, score, breaches;
+let towers = [], enemies = [], projectiles = [], particles = [];
+let selectedTowerType = null, selectedTower = null;
+let waveRunning = false, spawnQueue = [], spawnTimer = 0;
+let gameSpeed = 1, gameState = 'title';
+let frameId;
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+function initGame() {
+  credits = 150; serverHp = serverMaxHp = 100; wave = 0; score = 0; breaches = 0;
+  towers = []; enemies = []; projectiles = []; particles = [];
+  selectedTowerType = null; selectedTower = null;
+  waveRunning = false; spawnQueue = []; spawnTimer = 0;
+  gameSpeed = 1; gameState = 'playing';
+
+  document.getElementById('ov-title').classList.add('hidden');
+  document.getElementById('ov-gameover').classList.add('hidden');
+  document.getElementById('ov-win').classList.add('hidden');
+  document.getElementById('upgrade-panel').classList.remove('visible');
+
+  buildShop();
+  updateWaveInfo();
+  updateStartBtn();
+  updateHUD();
+  log('System initialized. Deploy defenses before launching wave.', 'info');
+
+  if (frameId) cancelAnimationFrame(frameId);
+  loop();
+}
+
+// ── SHOP ──────────────────────────────────────────────────────────────────────
+function buildShop() {
+  const grid = document.getElementById('tower-grid');
+  grid.innerHTML = '';
+  Object.entries(TOWER_DEFS).forEach(([key, def]) => {
+    const btn = document.createElement('button');
+    btn.className = 'tower-btn';
+    btn.id = 'tbtn-' + key;
+    btn.innerHTML = `<span class="t-icon">${def.icon}</span><span class="t-name">${def.name}</span><span class="t-cost">⬡ ${def.cost}</span><span class="t-desc">${def.desc}</span>`;
+    btn.style.color = def.color;
+    btn.onclick = () => selectTowerType(key);
+    grid.appendChild(btn);
+  });
+}
+
+function selectTowerType(key) {
+  selectedTowerType = (selectedTowerType === key) ? null : key;
+  selectedTower = null;
+  document.getElementById('upgrade-panel').classList.remove('visible');
+  document.querySelectorAll('.tower-btn').forEach(b => b.classList.remove('selected'));
+  if (selectedTowerType) {
+    const btn = document.getElementById('tbtn-' + key);
+    if (btn) btn.classList.add('selected');
+    log(`Selected: ${TOWER_DEFS[key].name} — click a green tile to place.`, 'info');
+  }
+}
+
+// ── TOWER PLACEMENT ───────────────────────────────────────────────────────────
+C.addEventListener('click', e => {
+  if (gameState !== 'playing') return;
+  const rect = C.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) * (W / rect.width);
+  const my = (e.clientY - rect.top) * (H / rect.height);
+  const col = Math.floor(mx / TILE), row = Math.floor(my / TILE);
+  const key = `${col},${row}`;
+
+  // Click on existing tower
+  const hit = towers.find(t => t.col===col && t.row===row);
+  if (hit) { selectTower(hit); return; }
+
+  // Place new tower
+  if (selectedTowerType && !PATH_SET.has(key)) {
+    const def = TOWER_DEFS[selectedTowerType];
+    if (credits < def.cost) { log('Insufficient credits!', 'bad'); return; }
+    credits -= def.cost;
+    const t = {
+      col, row,
+      x: col*TILE+TILE/2, y: row*TILE+TILE/2,
+      type: selectedTowerType,
+      ...JSON.parse(JSON.stringify({ damage: def.damage, range: def.range, speed: def.speed })),
+      splash: def.splash || 0, slow: def.slow || 0, cone: def.cone || false,
+      coneAngle: def.coneAngle || 0.45,
+      burns: false, chains: 0, stuns: false, multiTarget: 1,
+      targetsStrongest: false, multiSlow: 1, executes: false, disablesShield: false,
+      upgradeLevel: 0, shootTimer: 0, angle: 0,
+      totalCost: def.cost,
+    };
+    towers.push(t);
+    log(`${def.icon} ${def.name} deployed at [${col},${row}]`, 'good');
+    updateHUD();
+    updateShopBtns();
+  } else if (selectedTowerType && PATH_SET.has(key)) {
+    log('Cannot place on network path!', 'bad');
+  }
+});
+
+C.addEventListener('mousemove', e => {
+  if (gameState !== 'playing') return;
+  const rect = C.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) * (W / rect.width);
+  const my = (e.clientY - rect.top) * (H / rect.height);
+  const tt = document.getElementById('tooltip');
+  const hit = towers.find(t => Math.hypot(t.x - mx, t.y - my) < TILE/2);
+  if (hit && !selectedTowerType) {
+    const def = TOWER_DEFS[hit.type];
+    tt.innerHTML = `<span style="color:${def.color}">${def.icon} ${def.name}</span><br>DMG: ${hit.damage.toFixed(0)} | RNG: ${hit.range.toFixed(0)}<br>SPD: ${hit.speed.toFixed(1)}/s | LVL: ${hit.upgradeLevel}`;
+    tt.style.left = (mx + 12) + 'px';
+    tt.style.top  = (my - 10) + 'px';
+    tt.classList.add('show');
+  } else {
+    tt.classList.remove('show');
+  }
+});
+
+// ── TOWER SELECTION / UPGRADE ─────────────────────────────────────────────────
+function selectTower(t) {
+  selectedTower = t;
+  selectedTowerType = null;
+  document.querySelectorAll('.tower-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('upgrade-panel').classList.add('visible');
+  renderUpgradePanel();
+}
+
+function deselectTower() {
+  selectedTower = null;
+  document.getElementById('upgrade-panel').classList.remove('visible');
+}
+
+function renderUpgradePanel() {
+  if (!selectedTower) return;
+  const t = selectedTower;
+  const def = TOWER_DEFS[t.type];
+  document.getElementById('upg-name').textContent = `${def.icon} ${def.name}`;
+  document.getElementById('upg-name').style.color = def.color;
+  document.getElementById('upg-stats').innerHTML =
+    `DMG: <span>${t.damage.toFixed(0)}</span> | RNG: <span>${t.range.toFixed(0)}</span><br>SPD: <span>${t.speed.toFixed(1)}/s</span> | LVL: <span>${t.upgradeLevel}/${def.upgrades.length}</span>`;
+
+  const btns = document.getElementById('upg-btns');
+  btns.innerHTML = '';
+  def.upgrades.forEach((upg, i) => {
+    const done = t.upgradeLevel > i;
+    const avail = t.upgradeLevel === i;
+    const btn = document.createElement('button');
+    btn.className = 'upg-btn' + (done ? ' maxed' : '');
+    btn.disabled = done || !avail || credits < upg.cost;
+    if (done) {
+      btn.innerHTML = `<span>✓ ${upg.name}</span><span style="color:var(--dimtext)">Applied</span>`;
+    } else {
+      btn.innerHTML = `<span>${upg.name}: ${upg.desc}</span><span style="color:var(--yellow)">⬡${upg.cost}</span>`;
+      btn.onclick = () => applyUpgrade(t, upg, i);
+    }
+    btns.appendChild(btn);
+  });
+
+  const sellVal = Math.floor(t.totalCost * 0.6);
+  document.querySelector('.sell-btn').textContent = `SELL TOWER  ⬡ +${sellVal}`;
+}
+
+function applyUpgrade(t, upg, idx) {
+  if (credits < upg.cost || t.upgradeLevel !== idx) return;
+  credits -= upg.cost;
+  t.totalCost += upg.cost;
+  upg.apply(t);
+  t.upgradeLevel++;
+  log(`Upgraded: ${upg.name}`, 'good');
+  updateHUD();
+  updateShopBtns();
+  renderUpgradePanel();
+}
+
+function sellSelected() {
+  if (!selectedTower) return;
+  const val = Math.floor(selectedTower.totalCost * 0.6);
+  credits += val;
+  towers = towers.filter(t => t !== selectedTower);
+  log(`Tower sold for ⬡${val}`, 'info');
+  deselectTower();
+  updateHUD();
+  updateShopBtns();
+}
+
+function updateShopBtns() {
+  Object.keys(TOWER_DEFS).forEach(key => {
+    const btn = document.getElementById('tbtn-' + key);
+    if (btn) btn.disabled = credits < TOWER_DEFS[key].cost;
+  });
+}
+
+// ── WAVE SYSTEM ───────────────────────────────────────────────────────────────
+function startWave() {
+  if (waveRunning || wave >= WAVES.length) return;
+  wave++;
+  waveRunning = true;
+  spawnQueue = [];
+  document.getElementById('start-wave-btn').disabled = true;
+
+  const wCfg = WAVES[wave - 1];
+  let delay = 0;
+  wCfg.forEach(group => {
+    for (let i = 0; i < group.count; i++) {
+      spawnQueue.push({ type: group.type, at: delay });
+      delay += group.interval;
+    }
+  });
+  spawnTimer = 0;
+  updateHUD();
+  updateWaveInfo();
+  showWaveAnnounce(`WAVE ${wave} — INCOMING`);
+  log(`Wave ${wave} launched! ${spawnQueue.length} threats incoming.`, 'warn');
+}
+
+function updateWaveInfo() {
+  const el = document.getElementById('wave-info');
+  const next = wave < WAVES.length ? wave : wave - 1;
+  if (wave >= WAVES.length && !waveRunning) { el.textContent = 'All threats neutralized. Network secured!'; return; }
+  const wCfg = WAVES[Math.min(wave, WAVES.length - 1)];
+  const types = [...new Set(wCfg.map(g => g.type))];
+  el.innerHTML = `<b style="color:var(--yellow)">Wave ${wave+1} threats:</b><br>` +
+    types.map(tp => {
+      const d = THREAT_DEFS[tp];
+      return `<span class="threat-tag" style="background:${d.tag}22;border:1px solid ${d.tag}66;color:${d.color}">${d.icon} ${d.name}</span>`;
+    }).join(' ');
+}
+
+function updateStartBtn() {
+  const btn = document.getElementById('start-wave-btn');
+  if (wave >= WAVES.length) { btn.disabled = true; btn.textContent = 'ALL WAVES CLEARED'; return; }
+  btn.disabled = waveRunning;
+  btn.textContent = `► DEPLOY WAVE ${wave + 1}`;
+}
+
+function showWaveAnnounce(text) {
+  const el = document.getElementById('wave-bar');
+  el.textContent = text;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ── ENEMY SPAWNING ────────────────────────────────────────────────────────────
+function spawnEnemy(type) {
+  const def = THREAT_DEFS[type];
+  enemies.push({
+    type, pathIdx: 0,
+    x: PATH_PX[0].x, y: PATH_PX[0].y,
+    hp: def.hp * (1 + wave * 0.08),
+    maxHp: def.hp * (1 + wave * 0.08),
+    speed: def.speed,
+    baseSpeed: def.speed,
+    slowTimer: 0, stunTimer: 0, shielded: !!def.shielded,
+    shieldBroken: false,
+    reward: def.reward,
+    id: Math.random()
+  });
+}
+
+// ── MAIN LOOP ─────────────────────────────────────────────────────────────────
+let lastTime = 0;
+function loop(ts) {
+  frameId = requestAnimationFrame(loop);
+  const dt = Math.min((ts - lastTime) / 1000, 0.05) * gameSpeed;
+  lastTime = ts;
+  if (gameState === 'playing') {
+    updateGame(dt);
+    drawGame();
+  } else {
+    drawGame();
+  }
+}
+
+function updateGame(dt) {
+  // Spawning
+  if (spawnQueue.length > 0) {
+    spawnTimer += 60 * dt;
+    while (spawnQueue.length > 0 && spawnTimer >= spawnQueue[0].at) {
+      spawnEnemy(spawnQueue.shift().type);
+    }
+  }
+
+  // Check wave complete
+  if (waveRunning && spawnQueue.length === 0 && enemies.length === 0) {
+    waveRunning = false;
+    const bonus = wave * 20;
+    credits += bonus;
+    score += wave * 100;
+    log(`Wave ${wave} cleared! Bonus: ⬡${bonus}`, 'good');
+    updateHUD();
+    updateShopBtns();
+    updateStartBtn();
+    updateWaveInfo();
+    if (wave >= WAVES.length) { winGame(); return; }
+  }
+
+  // Move enemies
+  enemies.forEach(en => {
+    if (en.stunTimer > 0) { en.stunTimer -= dt; return; }
+    if (en.slowTimer > 0) { en.slowTimer -= dt; }
+    const spd = en.slowTimer > 0 ? en.speed * 0.4 : en.speed;
+
+    if (en.pathIdx >= PATH_PX.length - 1) {
+      // Reached server
+      serverHp -= 10;
+      breaches++;
+      score = Math.max(0, score - 50);
+      enemies = enemies.filter(e => e !== en);
+      log(`${THREAT_DEFS[en.type].icon} ${THREAT_DEFS[en.type].name} breached the server! -10 HP`, 'bad');
+      updateHUD();
+      if (serverHp <= 0) { gameOverEnd(); return; }
+      return;
+    }
+
+    const target = PATH_PX[en.pathIdx + 1];
+    const dx = target.x - en.x, dy = target.y - en.y;
+    const dist = Math.hypot(dx, dy);
+    const step = spd * TILE * dt;
+    if (step >= dist) { en.x = target.x; en.y = target.y; en.pathIdx++; }
+    else { en.x += dx/dist*step; en.y += dy/dist*step; }
+  });
+
+  // Towers shoot
+  towers.forEach(t => {
+    t.shootTimer -= dt;
+    if (t.shootTimer > 0) return;
+
+    let targets = enemies.filter(en => Math.hypot(en.x-t.x, en.y-t.y) <= t.range);
+    if (!targets.length) return;
+
+    // Target selection
+    let primary;
+    if (t.targetsStrongest) primary = targets.reduce((a,b) => a.hp > b.hp ? a : b);
+    else primary = targets.reduce((a,b) => a.pathIdx > b.pathIdx ? a : b); // furthest along path
+
+    t.angle = Math.atan2(primary.y - t.y, primary.x - t.x);
+
+    const def = TOWER_DEFS[t.type];
+
+    // Cone attack (Encryptor)
+    if (t.cone) {
+      targets.forEach(en => {
+        const angle = Math.atan2(en.y-t.y, en.x-t.x);
+        const diff = Math.abs(((angle - t.angle) + Math.PI*3) % (Math.PI*2) - Math.PI);
+        if (diff < t.coneAngle) {
+          if (t.disablesShield) en.shielded = false;
+          dealDamage(en, t.damage, t);
+        }
+      });
+    }
+    // Splash (Firewall)
+    else if (t.splash > 0) {
+      spawnProjectile(t, primary, () => {
+        enemies.forEach(en => {
+          if (Math.hypot(en.x-primary.x, en.y-primary.y) <= t.splash) {
+            dealDamage(en, t.damage, t);
+            if (t.burns) { en.slowTimer = 2; }
+          }
+        });
+        spawnParticle(primary.x, primary.y, def.color, 12, 2);
+      });
+    }
+    // Multi-target
+    else if (t.multiTarget > 1 || t.chains > 0) {
+      const count = Math.max(t.multiTarget, t.chains + 1);
+      const hits = targets.slice(0, count);
+      hits.forEach(en => {
+        spawnProjectile(t, en, () => {
+          dealDamage(en, t.damage, t);
+          if (t.stuns) en.stunTimer = 1.5;
+        });
+      });
+    }
+    // Standard single shot
+    else {
+      spawnProjectile(t, primary, () => {
+        dealDamage(primary, t.damage, t);
+        if (t.slow > 0) {
+          const slowTargets = enemies.filter(en => Math.hypot(en.x-primary.x, en.y-primary.y) < 40).slice(0, t.multiSlow || 1);
+          slowTargets.forEach(en => en.slowTimer = 2.5);
+        }
+        if (t.stuns) primary.stunTimer = 1.5;
+      });
+    }
+
+    t.shootTimer = 1 / t.speed;
+  });
+
+  // Move projectiles
+  projectiles = projectiles.filter(p => {
+    p.x += p.vx * dt * 60;
+    p.y += p.vy * dt * 60;
+    if (Math.hypot(p.x - p.tx, p.y - p.ty) < 8) {
+      p.onHit();
+      return false;
+    }
+    return true;
+  });
+
+  // Particles
+  particles.forEach(p => { p.x += p.vx*dt*60; p.y += p.vy*dt*60; p.life -= dt; p.vx *= 0.93; p.vy *= 0.93; });
+  particles = particles.filter(p => p.life > 0);
+
+  updateHUD();
+}
+
+function dealDamage(en, dmg, tower) {
+  if (en.shielded && !en.shieldBroken) {
+    en.shieldBroken = true;
+    en.shielded = false;
+    log(`${THREAT_DEFS[en.type].name} shield broken!`, 'warn');
+    spawnParticle(en.x, en.y, '#cc44ff', 10, 2);
+    return;
+  }
+  if (tower.executes && en.hp / en.maxHp < 0.15) { en.hp = 0; }
+  else { en.hp -= dmg; }
+  spawnParticle(en.x, en.y, THREAT_DEFS[en.type].color, 4, 1);
+  if (en.hp <= 0) {
+    credits += en.reward;
+    score += en.reward * 10;
+    const def = THREAT_DEFS[en.type];
+    if (def.splits && !en.split) {
+      for (let i=0; i<2; i++) {
+        const child = { ...en, hp: en.maxHp*0.4, maxHp: en.maxHp*0.4, speed: en.speed*1.3, reward: Math.floor(en.reward/2), split: true, id: Math.random() };
+        enemies.push(child);
+      }
+    }
+    enemies = enemies.filter(e => e !== en);
+    spawnParticle(en.x, en.y, def.color, 16, 2.5);
+  }
+}
+
+function spawnProjectile(tower, target, onHit) {
+  const dx = target.x - tower.x, dy = target.y - tower.y;
+  const dist = Math.hypot(dx, dy);
+  const spd = 6;
+  projectiles.push({
+    x: tower.x, y: tower.y,
+    tx: target.x, ty: target.y,
+    vx: dx/dist*spd, vy: dy/dist*spd,
+    color: TOWER_DEFS[tower.type].color,
+    onHit
+  });
+}
+
+function spawnParticle(x, y, color, count, speed) {
+  for (let i=0; i<count; i++) {
+    const a = Math.random()*Math.PI*2;
+    const s = Math.random()*speed + 0.3;
+    particles.push({ x, y, vx: Math.cos(a)*s, vy: Math.sin(a)*s, life: 0.4+Math.random()*0.4, color, size: Math.random()*3+1 });
+  }
+}
+
+// ── DRAW ──────────────────────────────────────────────────────────────────────
+function drawGame() {
+  ctx.fillStyle = '#060c10';
+  ctx.fillRect(0, 0, W, H);
+
+  drawGrid();
+  drawPath();
+  drawRangePreview();
+  drawTowers();
+  drawEnemies();
+  drawProjectiles();
+  drawParticles();
+  drawServerNode();
+}
+
+function drawGrid() {
+  ctx.strokeStyle = 'rgba(0,255,136,0.04)';
+  ctx.lineWidth = 1;
+  for (let c=0; c<=COLS; c++) { ctx.beginPath(); ctx.moveTo(c*TILE,0); ctx.lineTo(c*TILE,H); ctx.stroke(); }
+  for (let r=0; r<=ROWS; r++) { ctx.beginPath(); ctx.moveTo(0,r*TILE); ctx.lineTo(W,r*TILE); ctx.stroke(); }
+}
+
+function drawPath() {
+  // Path glow
+  ctx.save();
+  PATH_COORDS.forEach(([c,r]) => {
+    ctx.fillStyle = 'rgba(0,80,160,0.18)';
+    ctx.fillRect(c*TILE+1, r*TILE+1, TILE-2, TILE-2);
+  });
+
+  // Draw path line
+  ctx.beginPath();
+  PATH_PX.forEach((p,i) => i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
+  ctx.strokeStyle = 'rgba(0,150,255,0.25)';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // Arrows along path
+  ctx.fillStyle = 'rgba(0,150,255,0.3)';
+  for (let i=1; i<PATH_PX.length-1; i+=3) {
+    const prev = PATH_PX[i-1], curr = PATH_PX[i];
+    const angle = Math.atan2(curr.y-prev.y, curr.x-prev.x);
+    ctx.save();
+    ctx.translate(curr.x, curr.y);
+    ctx.rotate(angle);
+    ctx.beginPath();
+    ctx.moveTo(5,0); ctx.lineTo(-4,4); ctx.lineTo(-4,-4); ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Hover highlight for empty non-path tiles
+  if (selectedTowerType) {
+    for (let c=0; c<COLS; c++) for (let r=0; r<ROWS; r++) {
+      const key = `${c},${r}`;
+      if (!PATH_SET.has(key) && !towers.find(t=>t.col===c&&t.row===r)) {
+        ctx.fillStyle = 'rgba(0,255,136,0.05)';
+        ctx.fillRect(c*TILE+1, r*TILE+1, TILE-2, TILE-2);
+      }
+    }
+  }
+  ctx.restore();
+}
+
+function drawRangePreview() {
+  if (selectedTower) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(selectedTower.x, selectedTower.y, selectedTower.range, 0, Math.PI*2);
+    ctx.strokeStyle = `${TOWER_DEFS[selectedTower.type].color}55`;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4,4]);
+    ctx.stroke();
+    ctx.fillStyle = `${TOWER_DEFS[selectedTower.type].color}08`;
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawTowers() {
+  towers.forEach(t => {
+    const def = TOWER_DEFS[t.type];
+    const sel = selectedTower === t;
+    ctx.save();
+    ctx.translate(t.x, t.y);
+
+    // Base
+    ctx.beginPath();
+    ctx.rect(-TILE/2+3, -TILE/2+3, TILE-6, TILE-6);
+    ctx.fillStyle = sel ? `${def.color}22` : 'rgba(0,20,10,0.7)';
+    ctx.fill();
+    ctx.strokeStyle = sel ? def.color : def.color + '66';
+    ctx.lineWidth = sel ? 2 : 1;
+    ctx.stroke();
+
+    // Rotating barrel
+    ctx.rotate(t.angle);
+    ctx.fillStyle = def.color;
+    ctx.fillRect(-3, -TILE/2+5, 6, TILE/2-5);
+
+    ctx.restore();
+
+    // Icon
+    ctx.save();
+    ctx.font = '16px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(def.icon, t.x, t.y + 2);
+    ctx.restore();
+
+    // Level dots
+    if (t.upgradeLevel > 0) {
+      for (let i=0; i<t.upgradeLevel; i++) {
+        ctx.beginPath();
+        ctx.arc(t.x - 8 + i*8, t.y + TILE/2 - 5, 3, 0, Math.PI*2);
+        ctx.fillStyle = def.color;
+        ctx.fill();
+      }
+    }
+  });
+}
+
+function drawEnemies() {
+  enemies.forEach(en => {
+    const def = THREAT_DEFS[en.type];
+    const hpPct = en.hp / en.maxHp;
+
+    ctx.save();
+    ctx.translate(en.x, en.y);
+
+    // Shield ring
+    if (en.shielded) {
+      ctx.beginPath();
+      ctx.arc(0, 0, 16, 0, Math.PI*2);
+      ctx.strokeStyle = '#cc44ff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // Body
+    ctx.shadowColor = def.color;
+    ctx.shadowBlur = def.boss ? 20 : 8;
+    ctx.beginPath();
+    if (def.boss) {
+      for (let i=0; i<6; i++) {
+        const a = (i/6)*Math.PI*2;
+        i===0 ? ctx.moveTo(Math.cos(a)*14, Math.sin(a)*14) : ctx.lineTo(Math.cos(a)*14, Math.sin(a)*14);
+      }
+    } else if (def.fast) {
+      ctx.moveTo(0,-8); ctx.lineTo(7,8); ctx.lineTo(-7,8);
+    } else {
+      ctx.arc(0, 0, def.boss ? 14 : 10, 0, Math.PI*2);
+    }
+    ctx.closePath();
+    ctx.fillStyle = def.color + '44';
+    ctx.fill();
+    ctx.strokeStyle = def.color;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.restore();
+
+    // Icon
+    ctx.save();
+    ctx.font = def.boss ? '18px serif' : '13px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(def.icon, en.x, en.y);
+    ctx.restore();
+
+    // HP bar
+    const bw = def.boss ? 28 : 20;
+    const by = en.y - (def.boss ? 20 : 16);
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(en.x - bw/2, by, bw, 3);
+    ctx.fillStyle = hpPct > 0.5 ? '#00ff88' : hpPct > 0.25 ? '#ffaa00' : '#ff3355';
+    ctx.fillRect(en.x - bw/2, by, bw * hpPct, 3);
+
+    // Slow indicator
+    if (en.slowTimer > 0) {
+      ctx.fillStyle = 'rgba(0,220,255,0.4)';
+      ctx.beginPath();
+      ctx.arc(en.x, en.y, 13, 0, Math.PI*2);
+      ctx.fill();
+    }
+  });
+}
+
+function drawProjectiles() {
+  projectiles.forEach(p => {
+    ctx.save();
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3, 0, Math.PI*2);
+    ctx.fillStyle = p.color;
+    ctx.fill();
+    ctx.restore();
+  });
+}
+
+function drawParticles() {
+  particles.forEach(p => {
+    ctx.save();
+    ctx.globalAlpha = p.life * 1.5;
+    ctx.fillStyle = p.color;
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = 4;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  });
+}
+
+function drawServerNode() {
+  const lp = PATH_PX[PATH_PX.length - 1];
+  const t = Date.now() / 1000;
+  ctx.save();
+  ctx.translate(lp.x, lp.y);
+  ctx.shadowColor = '#00ff88';
+  ctx.shadowBlur = 15 + 8*Math.sin(t*2);
+  // Outer ring
+  ctx.beginPath();
+  ctx.arc(0, 0, 22, 0, Math.PI*2);
+  ctx.strokeStyle = `rgba(0,255,136,${0.3+0.2*Math.sin(t*3)})`;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  // Body
+  ctx.fillStyle = '#001a0a';
+  ctx.beginPath();
+  ctx.arc(0, 0, 16, 0, Math.PI*2);
+  ctx.fill();
+  ctx.strokeStyle = '#00ff88';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.restore();
+
+  // Label
+  ctx.save();
+  ctx.font = '16px serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('🖥', lp.x, lp.y);
+  ctx.restore();
+}
+
+// ── HUD ───────────────────────────────────────────────────────────────────────
+function updateHUD() {
+  document.getElementById('h-credits').textContent = '⬡ ' + credits;
+  document.getElementById('h-wave').textContent = wave + ' / ' + WAVES.length;
+  document.getElementById('h-breaches').textContent = breaches + ' / 10';
+  document.getElementById('h-score').textContent = score.toLocaleString();
+  document.getElementById('h-breaches').className = 'hstat-val' + (breaches >= 8 ? ' red' : breaches >= 5 ? ' orange' : '');
+
+  const hpPct = Math.max(0, serverHp / serverMaxHp * 100);
+  document.getElementById('server-health-fill').style.width = hpPct + '%';
+  if (hpPct < 30) document.getElementById('server-health-fill').style.background = 'linear-gradient(90deg,#ff3355,#ff6600)';
+  else if (hpPct < 60) document.getElementById('server-health-fill').style.background = 'linear-gradient(90deg,#ff8800,#ffe033)';
+  else document.getElementById('server-health-fill').style.background = 'linear-gradient(90deg,var(--green),var(--teal))';
+  document.getElementById('server-hp-text').textContent = `${Math.max(0,serverHp)} / ${serverMaxHp}`;
+}
+
+// ── LOG ───────────────────────────────────────────────────────────────────────
+function log(msg, type) {
+  const el = document.getElementById('log');
+  const line = document.createElement('div');
+  line.className = 'log-line ' + (type||'info');
+  const ts = new Date().toLocaleTimeString('en',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  line.textContent = `[${ts}] ${msg}`;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+  while (el.children.length > 30) el.removeChild(el.firstChild);
+}
+
+// ── SPEED ─────────────────────────────────────────────────────────────────────
+function toggleSpeed() {
+  const speeds = [1, 2, 3];
+  gameSpeed = speeds[(speeds.indexOf(gameSpeed) + 1) % speeds.length];
+  document.getElementById('speed-btn').textContent = gameSpeed + 'x';
+}
+
+// ── ENDINGS ───────────────────────────────────────────────────────────────────
+function gameOverEnd() {
+  gameState = 'over';
+  document.getElementById('go-stats').innerHTML =
+    `Score: <span style="color:var(--green)">${score.toLocaleString()}</span><br>
+     Wave reached: <span style="color:var(--yellow)">${wave} / ${WAVES.length}</span><br>
+     Breaches: <span style="color:var(--red)">${breaches}</span>`;
+  document.getElementById('ov-gameover').classList.remove('hidden');
+  log('SERVER BREACHED. System failure.', 'bad');
+}
+
+function winGame() {
+  gameState = 'win';
+  document.getElementById('win-stats').innerHTML =
+    `All ${WAVES.length} waves neutralized!<br>
+     Final Score: <span style="color:var(--green)">${score.toLocaleString()}</span><br>
+     Breaches Suffered: <span style="color:${breaches>0?'var(--orange)':'var(--green)'}">${breaches}</span>`;
+  document.getElementById('ov-win').classList.remove('hidden');
+  log('Network secured. All threats eliminated.', 'good');
+}
+
+// Start render loop immediately for background
+loop(0);
+</script>
+</body>
+</html>
